@@ -7,12 +7,8 @@ library(RCurl)
 library(foreign)
 library(reshape)
 library(caret)
-train <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/train.csv"),header = TRUE, stringsAsFactors = FALSE)
-test <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/test.csv"),header = TRUE, stringsAsFactors = FALSE)
-
-#rename to match code example
-trainData <- train
-testData <- test
+trainData <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/train.csv"),header = TRUE, stringsAsFactors = FALSE)
+testData <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/test.csv"),header = TRUE, stringsAsFactors = FALSE)
 
 # save the number of  rows in the train dataset
 trainData.nrow<-seq(1, nrow(trainData)) 
@@ -106,7 +102,7 @@ Title_survival
 
 
 #remove some data 
-trainData[c("PassengerId", "Ticket", "Fare", "Cabin")] <- list(NULL)
+trainData[c("Ticket", "Fare", "Cabin")] <- list(NULL)
 str(trainData)
 
 #Examine Embarked 
@@ -114,11 +110,11 @@ Embarked_survival <- table(trainData$Survived, trainData$Embarked)
 barplot(Embarked_survival, xlab="Port of Embarkment", ylab="Number of People", main="survived and deceased per Port of Embark")
 
 Embarked_survival
+#proportion table
 prop.table(Embarked_survival,2)
 
 #factorize 
 trainData$Sex <- as.factor(trainData$Sex)
-trainData$AdultChild <- as.factor(trainData$AdultChild)
 trainData$Embarked <- as.factor(trainData$Embarked)
 trainData$Fare2 <- as.factor(trainData$Fare2)
 trainData$AgeClass <- as.factor(trainData$AgeClass)
@@ -185,6 +181,33 @@ summary(trainData$Embarked)
 
 trainData$Embarked[which(is.na(trainData$Embarked) | trainData$Embarked=="")] <- 'S'
 
+# test data. It has no "Survival" values.
+testData <- trainData[-trainData.nrow, ]  
+#Train data
+trainData <- trainData[trainData.nrow, ] 
 
 
-model <- glm(Survived ~.,family=binomial(link='logit'),data=trainData)
+# split to test prediction models.
+set.seed(1234)
+inTrain<-createDataPartition(trainData$Survived, p = 0.8)[[1]]
+fit.8 <- glm(Survived ~ ., data=trainData[inTrain,], family=binomial(("logit")))
+summary(fit.8)
+
+fit.8 <- glm(Survived ~ Pclass + Sex + AgeClass + Fare2 + Embarked + SibSp + Parch, data=trainData[inTrain,], family=binomial(("logit")))
+summary(fit.8)
+
+
+fit.8 <- glm(Survived ~ Pclass + Sex + AgeClass + SibSp, data=trainData[inTrain,], family=binomial(("logit")))
+summary(fit.8)
+
+#test accuracy
+confusionMatrix(trainData[-inTrain,"Survived"], as.numeric(as.numeric(predict(fit.8, trainData[-inTrain,])>0.5)))$overall[1]
+
+# Code to prepeare test data for sumbiting on Kaggle. This code commented and for refernce only. 
+fit.8 <- glm(Survived ~ Pclass + Sex + AgeClass + SibSp, data=trainData, family=binomial(("logit")))
+predict.8<-predict(fit.8,  newdata=testData, type="response")
+testData$Survived <- as.numeric(as.numeric(predict.8)>0.5)
+write.csv(testData[,c("PassengerId", "Survived")],file="~/GitHub/kaggle-titanic/Submissions/result_8.csv", row.names=F)
+
+
+#model <- glm(Survived ~.,family=binomial(link='logit'),data=trainData)
