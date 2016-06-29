@@ -315,3 +315,54 @@ cv.ctrl <- trainControl(method = "repeatedcv", repeats = 3,
                         summaryFunction = twoClassSummary,
                         classProbs = TRUE)
 
+require(pROC)
+#Below is the train function call using the same formula (sans Fare) that we recently passed through glm function. I use the metric argument to tell train to optimize the model by maximizing the area under the ROC curve (AUC). summary(), another extractor function, is called to generate regression coefficients with standard errors and a z-test, plus the residual deviance metric we were watching earlier.
+set.seed(35)
+glm.tune.1 <- train(Fate ~ Sex + Class + Age + Family + Embarked,
+                    data = train.batch,
+                    method = "glm",
+                    metric = "ROC",
+                    trControl = cv.ctrl)
+glm.tune.1
+
+summary(glm.tune.1)
+
+#This is as good a time as any to introduce the concept of class compression. Think of it as collapsing particular levels on a categorical variable. One of the earlier bar graphs showed about 70 percent of the Titanic's passengers boarded the ship at Southampton. I'm going to use Embarked and the I() function, which inhibits interpretation & conversion of R objects, to create a new 2-level factor within the model formula. This factor is valued TRUE if a passenger's port of origin was Southampton ("S"), or FALSE otherwise.
+
+set.seed(35)
+glm.tune.2 <- train(Fate ~ Sex + Class + Age + Family + I(Embarked=="S"),
+                    data = train.batch, method = "glm",
+                    metric = "ROC", trControl = cv.ctrl)
+summary(glm.tune.2)
+
+#As I discussed earlier, the Title feature addresses more than one theme. For that reason, I believe it has real potential to improve this model. Besides, I put a good chunk of effort into it, so why not give it a go?
+set.seed(35)
+
+glm.tune.3 <- train(Fate ~ Sex + Class + Title + Age 
+                    + Family + I(Embarked=="S"), 
+                    data = train.batch, method = "glm",
+                    metric = "ROC", trControl = cv.ctrl)
+
+summary(glm.tune.3)
+
+#Nice! That gave us our first material decline in the residual deviance. Since the Title feature seems to give us everything that Age did (and more), I'm going to drop Age from the formula. I will also collapse the titles “Miss” and “Mrs” and leave a duo of Title-related factors which should represent the “women and children first” theme well.
+set.seed(35)
+glm.tune.4 <- train(Fate ~ Class + I(Title=="Mr") + I(Title=="Noble") 
+                    + Age + Family + I(Embarked=="S"), 
+                    data = train.batch, method = "glm",
+                    metric = "ROC", trControl = cv.ctrl)
+summary(glm.tune.4)
+
+#Remember that there were a lot of male passengers in third class. Given the “women and children first” policy already mentioned plus reports that the Titanic's internal layout was confusing (I recall reading that one crew member claimed it took him two weeks to become comfortable with finding his way around the ship), to say that “grown men in the lower decks had it tough” is such a gross understatement that I hesitated to put it in type. A feature reflecting those third-class men might make a further dent in that residual deviance. Indeed, it does...
+set.seed(35)
+glm.tune.5 <- train(Fate ~ Class + I(Title=="Mr") + I(Title=="Noble") 
+                    + Age + Family + I(Embarked=="S") 
+                    + I(Title=="Mr"&Class=="Third"), 
+                    data = train.batch, 
+                    method = "glm", metric = "ROC", 
+                    trControl = cv.ctrl)
+summary(glm.tune.5)
+
+#Unfortunately, the other features did not contribute to further deviance compression. Taking a different approach to representing the “women and children first” policy didn't bear fruit (removing the title references in the formula and adding Boat.dibs produced a residual deviance of 565 -- no better than what we already have, using a new feature which some may find confusing). Given that Deck and Side combined (a) shaved just a few points off of the deviance, and (b) were derived from such a small subset of the training data, I decided to withdraw them from consideration.
+
+
