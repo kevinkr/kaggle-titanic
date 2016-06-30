@@ -125,7 +125,7 @@ unique(df.train$Title)
 
 install.packages("Hmisc")
 
-options(digits=2)
+options(digits=4)
 require(Hmisc)
 bystats(df.train$Age, df.train$Title, 
         fun=function(x)c(Mean=mean(x),Median=median(x)))
@@ -179,12 +179,12 @@ summary(df.train$Fare)
 
 #Recall from the bystats results above that the training data contains 17 different titles. We already know that "Master" and "Mr" should separate the males into roughly two groups by age. The following script...
 
-df.train$Title <- factor(df.train$Title,
-                         c("Capt","Col","Major","Sir","Lady","Rev",
-                           "Dr","Don","Jonkheer","the Countess","Mrs",
-                           "Ms","Mr","Mme","Mlle","Miss","Master"))
-boxplot(df.train$Age ~ df.train$Title, 
-        main="Passenger Age by Title", xlab="Title", ylab="Age")
+#df.train$Title <- factor(df.train$Title,
+#                         c("Capt","Col","Major","Sir","Lady","Rev",
+#                           "Dr","Don","Jonkheer","the Countess","Mrs",
+#                           "Ms","Mr","Mme","Mlle","Miss","Master"))
+#boxplot(df.train$Age ~ df.train$Title, 
+#        main="Passenger Age by Title", xlab="Title", ylab="Age")
 #https://drive.google.com/file/d/0B-yx9UUIpB6ubEZ5NU5WSFo1U0E/edit?pref=2&pli=1
 
 #...produces this boxplot (too wide for display here) showing passenger age by title, including shading which illustrates the manner in which I consolidated the titles. I created and applied a custom function for revaluing the titles, then reclassified Title to a factor type, as follows:
@@ -266,7 +266,7 @@ df.train <- featureEngrg(df.train)
 
 train.keeps <- c("Fate", "Sex", "Boat.dibs", "Age", "Title", 
                  "Class", "Deck", "Side", "Fare", "Fare.pp", 
-                 "Embarked", "Family")
+                 "Embarked", "Family","Survived")
 df.train.munged <- df.train[train.keeps]
 
 #Fitting a model
@@ -365,4 +365,158 @@ summary(glm.tune.5)
 
 #Unfortunately, the other features did not contribute to further deviance compression. Taking a different approach to representing the “women and children first” policy didn't bear fruit (removing the title references in the formula and adding Boat.dibs produced a residual deviance of 565 -- no better than what we already have, using a new feature which some may find confusing). Given that Deck and Side combined (a) shaved just a few points off of the deviance, and (b) were derived from such a small subset of the training data, I decided to withdraw them from consideration.
 
+#Other Models
 
+#Logistic regression is certainly not the only binary classification model available. There are plenty more –- perhaps too many for some data scientists to digest. For purpose of illustration, I'll simply take the logistic regression model formula from glm.tune.1 and pass it through train() for each of three other model types, with one new twist: tuning variables specific to each model.
+
+#First up is boosting. I can instruct train to fit a stochastic boosting model for the binary response Fate using the adapackage and a range of values for each of three tuning parameters. Concretely, when fitting a model using train with method=”ada”, one has three levers to tweak: iter (number of boosting iterations, default=50), maxdepth (depth of trees), and nu (shrinkage parameter, default=1). Create a data frame with these three variables as column names and one row per tuning variable combination, and you're good to go. Here is just one example of a tuning grid for ada:
+#http://en.wikipedia.org/wiki/AdaBoost
+
+## note the dot preceding each variable
+ada.grid <- expand.grid(.iter = c(50, 100),
+                        .maxdepth = c(4, 8),
+                        .nu = c(0.1, 1))
+
+#Specify method=”ada” and tuneGrid=ada.grid in train, and away we go...
+
+set.seed(35)
+ada.tune <- train(Fate ~ Sex + Class + Age + Family + Embarked, 
+                  data = train.batch,
+                  method = "ada",
+                  metric = "ROC",
+                  tuneGrid = ada.grid,
+                  trControl = cv.ctrl)
+
+ada.tune
+
+plot(ada.tune)
+
+#Time to give the popular Random Forest (RF) model a shot at the Titanic challenge. The number of randomly pre-selected predictor variables for each node, designated mtry, is the sole parameter available for tuning an RF with train. Since the number of features is so small, there really isn't much scope for tuning mtry in this case. Nevertheless, I'll demonstrate here how it can be done. Let's have mtry=2 and mtry=3 duke it out over the Titanic data.
+
+rf.grid <- data.frame(.mtry = c(2, 3))
+set.seed(35)
+rf.tune <- train(Fate ~ Sex + Class + Age + Family + Embarked, 
+                 data = train.batch,
+                 method = "rf",
+                 metric = "ROC",
+                 tuneGrid = rf.grid,
+                 trControl = cv.ctrl)
+
+#Strobl et al suggested setting mtry at the square root of the number of variables. In this case, that would be mtry = 2, which did produce the better RF model
+rf.tune
+
+#And finally, we'll fit a support vector machine (SVM) model to the Titanic data. There are two functions which can be tuned for SVM using train. The default value for one of them -– sigest –- produces good results on most occasions. The default grid of cost parameter C is 0.25, 0.5, and 1. If we set train argument tuneLength = 9, the grid expands to c(0.25, 0.5, 1, 2, 4, 8, 16, 32, 64). As SVM is considered sensitive to the scale and magnitude of the presented features, I'll use the preProcess argument to instruct train to make arrangements for normalizing the data within resampling loops.
+
+set.seed(35)
+svm.tune <- train(Fate ~ Sex + Class + Age + Family + Embarked, 
+                  data = train.batch,
+                  method = "svmRadial",
+                  tuneLength = 9,
+                  preProcess = c("center", "scale"),
+                  metric = "ROC",
+                  trControl = cv.ctrl)
+
+#You may have noticed that the same random number seed was set prior to fitting each model. This ensures that the same resampling sets are used for each model, enabling an "apple-to-apples" comparison of the resampling profiles between models during model evaluation.
+svm.tune
+
+#Although the model output above does display ROC by cost parameter value, the following graph makes it abundantly clear that the ROC starts dropping at C=4. alt text
+
+#Model Evaluation
+
+#With all four models in hand, I can begin to evaluate their performance by whipping together some cross-tabulations of the observed and predicted Fate for the passengers in the test.batch data. caret makes this easy with the confusionMatrix function.
+
+## Logistic regression model
+glm.pred <- predict(glm.tune.5, test.batch)
+confusionMatrix(glm.pred, test.batch$Fate)
+
+## Boosted model
+ada.pred <- predict(ada.tune, test.batch)
+confusionMatrix(ada.pred, test.batch$Fate)
+
+## Random Forest model
+rf.pred <- predict(rf.tune, test.batch)
+confusionMatrix(rf.pred, test.batch$Fate)
+
+## SVM model 
+svm.pred <- predict(svm.tune, test.batch)
+confusionMatrix(svm.pred, test.batch$Fate)
+
+#(Perhaps now you've come to appreciate why I revalued the Fate feature earlier!) While there are no convincing conclusions to be drawn from the confusion matrices embedded within the outputs above, the logistic regression model we put together earlier appears to do the best job of selecting the survivors among the passengers in the test.batch. The Random Forest model, on the other hand, seems to have a slight edge on predicting those who perished.
+
+#We can also calculate, using each of the four fitted models, the predicted probabilities for the test.batch, and use those probabilities to plot the ROC curves.
+
+## Logistic regression model (BLACK curve)
+glm.probs <- predict(glm.tune.5, test.batch, type = "prob")
+glm.ROC <- roc(response = test.batch$Fate,
+               predictor = glm.probs$Survived,
+               levels = levels(test.batch$Fate))
+plot(glm.ROC, type="S")   
+
+## Boosted model (GREEN curve)
+ada.probs <- predict(ada.tune, test.batch, type = "prob")
+ada.ROC <- roc(response = test.batch$Fate,
+               predictor = ada.probs$Survived,
+               levels = levels(test.batch$Fate))
+plot(ada.ROC, add=TRUE, col="green")    
+
+## Random Forest model (RED curve)
+rf.probs <- predict(rf.tune, test.batch, type = "prob")
+rf.ROC <- roc(response = test.batch$Fate,
+              predictor = rf.probs$Survived,
+              levels = levels(test.batch$Fate))
+plot(rf.ROC, add=TRUE, col="red") 
+
+## SVM model (BLUE curve)
+svm.probs <- predict(svm.tune, test.batch, type = "prob")
+svm.ROC <- roc(response = test.batch$Fate,
+               predictor = svm.probs$Survived,
+               levels = levels(test.batch$Fate))
+plot(svm.ROC, add=TRUE, col="blue")
+
+#The following R script uses caret function resamples to collect the resampling results, then calls the dotplot function to create a visualization of the resampling distributions. I'm typically not one for leaning on a single metric for important decisions, but if you have been looking for that one graph which sums up the performance of the four models, this is it.
+
+cv.values <- resamples(list(Logit = glm.tune.5, Ada = ada.tune, 
+                            RF = rf.tune, SVM = svm.tune))
+dotplot(cv.values, metric = "ROC")
+
+#The next graph (my last, scout's honor) compares the four models on the basis of ROC, sensitivity, and specificity. Here, sensitivity (“Sens” on the graph) is the probability that a model will predict a Titanic passenger's death, given that the passenger actually did perish. Think of sensitivity in this case as the true perished rate. Specificity (“Spec”), on the other hand, is the probability that a model will predict survival, given that the passenger actually did survive. Simply put, all four models were better at predicting passenger fatalities than survivals, and none of them are significantly better or worse than the other three. Of the four, if I had to pick one, I'd probably put my money on the logistic regression model. 
+
+#Cast Your Votes
+
+#Given everything we've been through here, it would be a shame if we didn't submit at least one of the four models to the Titanic competition at Kaggle. Here is a script which munges the data Kaggle provided in their test.csv file, uses that data and the logistic regression model glm.tune.5 to predict the survival (or not) of passengers listed in the test file, links the predictions to the PassengerId in a data frame, and writes those results to a submission-ready csv file.
+
+# get titles
+df.infer$Title <- getTitle(df.infer)
+
+# impute missing Age values
+df.infer$Title <- changeTitles(df.infer, c("Dona", "Ms"), "Mrs")
+titles.na.test <- c("Master", "Mrs", "Miss", "Mr")
+df.infer$Age <- imputeMedian(df.infer$Age, df.infer$Title, titles.na.test)
+
+# consolidate titles
+df.infer$Title <- changeTitles(df.infer, c("Col", "Dr", "Rev"), "Noble")
+df.infer$Title <- changeTitles(df.infer, c("Mlle", "Mme"), "Miss")
+df.infer$Title <- as.factor(df.infer$Title)
+
+# impute missing fares
+df.infer$Fare[ which( df.infer$Fare == 0)] <- NA
+df.infer$Fare <- imputeMedian(df.infer$Fare, df.infer$Pclass, 
+                              as.numeric(levels(df.infer$Pclass)))
+# add the other features
+df.infer <- featureEngrg(df.infer)
+
+# data prepped for casting predictions
+test.keeps <- train.keeps[-1]
+pred.these <- df.infer[test.keeps]
+
+# use the logistic regression model to generate predictions
+Survived <- predict(glm.tune.5, newdata = pred.these)
+
+# reformat predictions to 0 or 1 and link to PassengerId in a data frame
+Survived <- revalue(Survived, c("Survived" = 1, "Perished" = 0))
+predictions <- as.data.frame(Survived)
+predictions$PassengerId <- df.infer$PassengerId
+
+# write predictions to csv file for submission to Kaggle
+write.csv(predictions[,c("PassengerId", "Survived")], 
+          file="Titanic_predictions.csv", row.names=FALSE, quote=FALSE)
