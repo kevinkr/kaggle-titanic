@@ -1,0 +1,172 @@
+#Philippe Adjiman blog post on titanic
+#http://www.philippeadjiman.com/blog/2013/09/12/a-data-science-exploration-from-the-titanic-in-r/
+
+library(caret)
+library(pROC)
+library(Amelia)
+
+#replace below by your own path on disk or cloud
+
+#rawdata will be used for both training and cross validation test
+rawdata <- read.csv("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/train.csv",stringsAsFactors = F)
+#this data won't be used in model evaluation. It will only be used for the submission.
+test <- read.csv("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/test.csv",stringsAsFactors = F)
+
+#used to unify attribute names which were different in training vs data sets in original data
+names(test) = c("PassengerId", names(rawdata)[2:11])
+
+#printing some missing data
+par("mfrow" = c(1,2)) 
+missmap(rawdata, main = "Missingness Map Train")
+missmap(test, main = "Missingness Map Test")
+par("mfrow" = c(1,1)) 
+
+
+################################
+######  DATA PREPARATION  ######
+################################
+
+
+#functions to add the title feature to the data + do some conversions to factors
+#source("~/Google\ Drive/padjiman/data/kaggle/titanic/src/processData.r")
+
+#The two following methods are a subset of the code that can be found here https://github.com/chungkhim/titanic/blob/master/processData.r
+enrichData = function(x)
+{
+  nameSplit = sapply(x["name"], function(y) {strsplit(y, "[,.] | [ ]")})
+  x["lastName"] = sapply(nameSplit, function(y) {y[1]})
+  x["title"] = sapply(nameSplit, function(y) {y[2]})
+  x["otherName"] = sapply(nameSplit, function(y) {y[3]})    
+  
+  return(x)
+}
+
+#aggreating some rare occurence of titles into broader categories
+refineData = function(x)
+{
+  ladies = c( "Mme" , "the Countess" , "Lady" ,  "Dona" )
+  x$title[x$title %in% ladies] = "Mrs"
+  
+  miss = c("Mlle", "Ms")
+  x$title[x$title %in% miss] = "Miss"
+  
+  ranks = c("Capt", "Col", "Major","Sir", "Don","Dr")
+  x$title[x$title %in% ranks] = "Mr"
+  
+  masters = c("Jonkheer")
+  x$title[x$title %in% masters] = "Master"
+  
+  
+  return(x)
+  
+}  
+
+#wrapper function to enrich and refine the train/data sets as long
+#as casting some variables into factors
+processData <- function(data){
+  data <- enrichData(data)
+  data <- refineData(data)  
+  
+  #pclass  sex and title should be considered as a factors
+  data$pclass <- as.factor(data$pclass )
+  data$sex <- as.factor(data$sex )
+  data$title <- as.factor(data$title )
+  
+  return(data);
+  
+}
+rawdata <- processData(rawdata)
+test <- processData(test)
+
+
+#imputing the one missing fare in the test set by a simple mean 
+meanFare = mean(na.omit(rawdata$fare))
+test[which( is.na(test$fare) ), ]$fare = meanFare
+
+#to make roc work properly later on, we need to have the predicted class to be real labels rather than just 0 or 1
+rawdata$survived <- factor(rawdata$survived, labels = c("yes","no"))
+
+#class should be considered as a factor rather than a num
+rawdata$pclass <- as.factor(rawdata$pclass )
+test$pclass <- as.factor(test$pclass )
+
+#create a training and test set for building and evaluating the model
+#we set the seed to create each time the same (here 80/20) split
+set.seed(4)
+#samples <- createDataPartition(rawdata$survived, p = 0.8,list = FALSE)
+samples <- sample(nrow(rawdata), nrow(rawdata)*0.8)
+data.train <- rawdata[samples, ]
+data.test <- rawdata[-samples, ]
+
+#plotting ages distribution per title
+boxplot( data.train$age ~ data.train$title   ,col="blue" , varwidth=TRUE) 
+
+################################
+######  MODEL BUILDING    ######
+################################
+
+#training a random forest (default algo in caret)
+
+#WARNING: the exposed accurracy measure below are rounded for some reasons and always expose 0.8 no 
+#matter what, couldn't find the reason. The real/not rounded accuracy shows up fine when executed on 
+#regular R console
+
+model1 <- train(survived ~ pclass + sex + title + sibsp +parch , data.train, importance=TRUE)
+model1
+vaImp.model1 <- varImp(model1, verbose = FALSE) 
+vaImp.model1
+
+
+#training a gbm. won't be used but exposed here just for the sake of the example
+fitControl <- trainControl(## 10-fold CV 
+  method = "repeatedcv", 
+  number = 10, 
+  ## repeated ten times 
+  repeats = 10)
+
+model2 <- train(survived ~   pclass + sex +  + sibsp +parch , 
+                data.train, distribution = "gaussian", method = "gbm",trControl = fitControl, verbose = FALSE)
+
+
+model2
+vaImp.model2 <- varImp(model2) 
+vaImp.model2
+
+
+################################
+######  MODEL ROC EVAL    ######
+################################
+
+
+#code inspired from http://mkseo.pe.kr/stats/?p=790
+result.predicted.prob.model1 <- predict(model1, data.test, type="prob")
+result.roc.model1 <-  roc(data.test$survived, result.predicted.prob.model1$yes)
+plot(result.roc.model1, print.thres="best", print.thres.best.method="closest.topleft")
+
+result.coords.model1 <- coords(  result.roc.model1, "best", best.method="closest.topleft", 
+                                 ret=c("threshold", "accuracy"))
+result.coords.model1
+
+################################
+######  OBSERVING ERRORS    #####
+################################
+
+result.predicted.train <- predict(model1, data.train, type="prob")
+factorPreditions.train <- factor(ifelse(result.predicted.train[,1] > result.coords.model1[1], 0,1), labels = c("yes","no"))
+xtabs(~ factorPreditions.train + data.train$survived)
+wrongClassification <- data.train[(factorPreditions.train != data.train$survived) , ]
+#wrongClassification
+
+################################
+#########  SUBMISSION    #######
+################################
+
+##here using model 1
+
+result.predicted.final <- predict(model1, test, type="prob")
+numericPreditions <- ifelse(result.predicted.final[,1] > result.coords.model1[1], 0,1)
+submission = data.frame(PassengerId = test[,1] , Survived = numericPreditions) 
+
+#this will generate quotes in the headers, make sure to remove them if you want to submit the file, otherwise the sumbission parser will break
+#This output will give a score of 0.79426 on the leaderbord (corresponding to about the top 5% best submissions)
+write.table(submission,file="~/Google\ Drive/padjiman/data/kaggle/titanic/finalOutput.csv",sep=",",row.names=FALSE, col.names=TRUE)
