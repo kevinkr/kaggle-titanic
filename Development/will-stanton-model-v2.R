@@ -2,13 +2,14 @@
 library(caret)
 library(randomForest)
 
-
+#read function 
 readData <- function(path.name, file.name, column.types, missing.types) {
   read.csv( url( paste(path.name, file.name, sep="") ), 
             colClasses=column.types,
             na.strings=missing.types )
 }
 
+#establish values for read function
 Titanic.path <- "https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/"
 train.data.file <- "train.csv"
 test.data.file <- "test.csv"
@@ -16,7 +17,7 @@ missing.types <- c("NA", "")
 train.column.types <- c('integer',   # PassengerId
                         # 'factor',    # Survived
                         'integer',    # Survived
-                        'factor',    # Pclass
+                        'integer',    # Pclass
                         'character', # Name
                         'factor',    # Sex
                         'numeric',   # Age
@@ -37,30 +38,47 @@ test.raw <- readData(Titanic.path, test.data.file,
                      test.column.types, missing.types)
 testSet <- test.raw
 
-head(trainSet)
+# save the number of  rows in the train dataset
+trainSet.nrow<-seq(1, nrow(trainSet)) 
 
-head(testSet)
+#merge rows
+trainSet<-rbind(trainSet, cbind(testSet, Survived=rep(NA, nrow(testSet)))) 
 
-#We want to know which variables are the best predictors for “Survived,” so we will look at the crosstabs between “Survived” and each other variable
+#
+#
+#
+#
+#Examine some basic information
+plot(density(trainSet$Age, na.rm = TRUE))
+
+plot(density(trainSet$Pclass, na.rm = TRUE))
+
+#We want to know which variables are the best predictors for “Survived,” so we will look at the 
+#crosstabs between “Survived” and each other variable
 table(trainSet[,c("Survived", "Pclass")])
 
-#Looking at this crosstab, we can see that “Pclass” could be a useful predictor of “Survived.” Why? The first column of the crosstab shows that of the passengers in Class 1, 136 survived and 80 died (ie. 63% of first class passengers survived). On the other hand, in Class 2, 87 survived and 97 died (ie. only 47% of second class passengers survived). Finally, in Class 3, 119 survived and 372 died (ie. only 24% of third class passengers survived). 
+#Examine cabin class
+Pclass_survival <- table(trainSet$Survived, trainSet$Pclass)
+barplot(Pclass_survival, xlab = "Cabin Class", ylab = "Number of People", 
+        main = "survived and deceased between male and female")
+
+#Looking at this crosstab, we can see that “Pclass” could be a useful predictor of “Survived.” 
+#Why? The first column of the crosstab shows that of the passengers in Class 1, 136 survived and 80 died (ie. 63% of first class passengers survived). On the other hand, in Class 2, 87 survived and 97 died (ie. only 47% of second class passengers survived). Finally, in Class 3, 119 survived and 372 died (ie. only 24% of third class passengers survived). 
 #We definitely want to use Pclass in our model, because it definitely has strong predictive value of whether someone survived or not.
 
 table(trainSet[,c("Survived", "Sex")])
-#Sex looks useful
+
+counts <- table(trainSet$Survived, trainSet$Sex)
+barplot(counts, xlab = "Gender", ylab = "Number of People", main = "survived and deceased between male and female")
 
 table(trainSet[,c("Survived", "Embarked")])
 #Embarked
 
 #Plots for continuous variables
 
-#Plots are often a better way to identify useful continuous variables than crosstabs are (this is mostly because crosstabs aren't so natural for numerical variables). We will use “conditional” box plots to compare the distribution of each continuous variable, conditioned on whether the passengers survived or not ('Survived' = 1 or 'Survived' = 0). You may need to install the *fields* package first, just like you installed *caret* and *randomForest*.
-
 # Comparing Age and Survived.
 library(fields)
 bplot.xy(trainSet$Survived, trainSet$Age)
-#The box plot of age for those who survived and and those who died are nearly the same. That means that Age probably did not have a large effect on whether one survived or not. The y-axis is Age and the x-axis is Survived (Survived = 1 if the person survived, 0 if not).
 
 #make temp variable and change 0 levels to 1 to plot on log y scale
 trainSet$Fare2 <- trainSet$Fare
@@ -69,10 +87,40 @@ trainSet$Fare2[(trainSet$Fare2 == 0)] <-1
 bplot.xy(trainSet$Survived, trainSet$Fare2, main="Titanic Pasenger Fate and Fare Paid", 
          xlab="Fate", ylab="Fair Paid", log="y")
 
+#remove Fare2
+trainSet[c("Fare2")] <- list(NULL)
+
+#Examine distribution of class fare
+#split into buckets
+trainSet$Fare2 <- '30+'
+trainSet$Fare2[trainSet$Fare < 30 & trainSet$Fare >= 20] <- '20-30'
+trainSet$Fare2[trainSet$Fare < 20 & trainSet$Fare >= 10] <- '10-20'
+trainSet$Fare2[trainSet$Fare < 10] <- '<10'
+
+Fare2_survival <- table(trainSet$Survived, trainSet$Fare2)
+
+Fare2_survival
+barplot(Fare2_survival, xlab="Fare Group", ylab="Number of People", main="survived and deceased per fare group")
+
+#
+#Examine Age in classes
+#
+trainSet$AgeClass <- '60+'
+trainSet$AgeClass[trainSet$Age < 60 & trainSet$Age >= 50] <- '50-60'
+trainSet$AgeClass[trainSet$Age < 50 & trainSet$Age >= 40] <- '40-50'
+trainSet$AgeClass[trainSet$Age < 40 & trainSet$Age >= 30] <- '30-40'
+trainSet$AgeClass[trainSet$Age < 30 & trainSet$Age >= 20] <- '20-30'
+trainSet$AgeClass[trainSet$Age < 20 & trainSet$Age >= 10] <- '10-20'
+trainSet$AgeClass[trainSet$Age < 10] <- '0-9'
+
+AgeClass_survival <- table(trainSet$Survived, trainSet$AgeClass)
+
+barplot(AgeClass_survival, xlab="Age Group", ylab="Number of People", main="survived and deceased per age group")
+
+
+
 #Training a model
 
-#Training the model uses a pretty simple command in caret, but it's important to understand each piece of the syntax. First, we have to convert Survived to a Factor data type, so that caret builds a classification instead of a regression model. Then, we use the train command to train the model (go figure!). You may be asking what a random forest algorithm is. You can think of it as training a bunch of different decision trees and having them vote
-#(remember, this is an irresponsibly fast tutorial). Random forests work pretty well in *lots* of different situations, so I often try them first. 
 
 # Convert Survived to Factor
 trainSet$Survived <- factor(trainSet$Survived)
