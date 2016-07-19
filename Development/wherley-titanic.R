@@ -56,7 +56,7 @@ barplot(table(df.train$Embarked),
         names.arg = c("Cherbourg", "Queenstown", "Southampton"),
         main="Embarked (port of embarkation)", col="sienna")
 #str(df.train$Embarked)
-install.packages("vcd")
+#install.packages("vcd")
 
 #travelling class for mosaic plot
 mosaicplot(df.train$Pclass ~ df.train$Survived, 
@@ -78,7 +78,7 @@ mosaicplot(df.train$Embarked ~ df.train$Survived,
            main="Passenger Fate by Port of Embarkation",
            shade=FALSE, color=TRUE, xlab="Embarked", ylab="Survived")
 
-install.packages("corrgram")
+#install.packages("corrgram")
 
 require(corrgram)
 corrgram.data <- df.train
@@ -123,7 +123,7 @@ unique(df.train$Title)
 
 #To identify the titles which have at least one record with an age missing, I'll use the bystats function from the Hmisc package.
 
-install.packages("Hmisc")
+#install.packages("Hmisc")
 
 options(digits=4)
 require(Hmisc)
@@ -263,6 +263,7 @@ df.train <- featureEngrg(df.train)
 #Deck - levels are as shown in the Titanic cross-section displayed previously. Cabin data provided for just 23 percent of training data records, so it's tough to give this one much emphasis.
 #Side - subject to the same concern (dearth of data) expressed for Deck
 #I finish the data munging process by paring down the data frame to the columns I will use in model building.
+require(caret)
 
 train.keeps <- c("Fate", "Sex", "Boat.dibs", "Age", "Title", 
                  "Class", "Deck", "Side", "Fare", "Fare.pp", 
