@@ -4,6 +4,9 @@
 library(caret)
 library(rpart)
 library(pROC)
+library(RCurl)
+library(foreign)
+library(reshape)
 
 #Load data
 titanic_train <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/train.csv"),header = TRUE, stringsAsFactors = TRUE)
@@ -96,7 +99,6 @@ changeTitles <- function(data, old.titles, new.title) {
 }
 
 #We can use this function to assign the titles to broader categories and update our feature. The only change I made from Wehrley’s was to add the title of “Dona” when assigning the titles to categories.
-R
 
 full_data$Title <- changeTitles(full_data, c("Capt", "Col", "Don", "Dona", "Dr", "Jonkheer", "Lady", "Major",
                                              "Rev", "Sir"), "Noble")
@@ -151,9 +153,9 @@ write.csv(logistic_submission, file = "liberty-and-data-logistic_submission.csv"
 #Generalized Additive Model (GAM)
 ##################
 #The second model choice, and the model for which I originally decided to write this post, is the generalized additive model (GAM). GAMs are both interpretable and flexible, which makes them very useful. I will build a fairly simple boosted GAM using the train function in the caret package.
-
 gam.model <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Family + Fare + Embarked + Title, 
-                   data = titanic_train, method = "gamboost", 
+                   data = titanic_train, 
+                   method = "gamboost", 
                    preProc = c("center", "scale"))
 
 #To get a sense of the accuracy, we can look at our model as well as the confusion matrix and statistics.
