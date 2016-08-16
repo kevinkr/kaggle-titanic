@@ -31,18 +31,8 @@ test.raw <- readData(Titanic.path, test.data.file,
                      test.column.types, missing.types)
 df.infer <- test.raw
 
-require(plyr)     # for the revalue function 
-require(stringr)  # for the str_sub function
-require(Amelia)   # For missing data mssmap
-require(Hmisc)    # for impute and some bystats
-require(vcd)
-require(corrgram)
-require(caret)
-require(pROC)
-require(ada)
-
-
 ## map missing data by provided feature
+require(Amelia)
 missmap(df.train, main="Titanic Training Data - Missings Map", 
         col=c("yellow", "black"), legend=FALSE)
 
@@ -66,6 +56,7 @@ barplot(table(df.train$Embarked),
         names.arg = c("Cherbourg", "Queenstown", "Southampton"),
         main="Embarked (port of embarkation)", col="sienna")
 #str(df.train$Embarked)
+#install.packages("vcd")
 
 #travelling class for mosaic plot
 mosaicplot(df.train$Pclass ~ df.train$Survived, 
@@ -88,6 +79,8 @@ mosaicplot(df.train$Embarked ~ df.train$Survived,
            shade=FALSE, color=TRUE, xlab="Embarked", ylab="Survived")
 
 #install.packages("corrgram")
+
+require(corrgram)
 corrgram.data <- df.train
 ## change features of factor type to numeric type for inclusion on correlogram
 corrgram.data$Survived <- as.numeric(corrgram.data$Survived)
@@ -131,10 +124,9 @@ unique(df.train$Title)
 #To identify the titles which have at least one record with an age missing, I'll use the bystats function from the Hmisc package.
 
 #install.packages("Hmisc")
-#require(Hmisc)
 
 options(digits=4)
-
+require(Hmisc)
 bystats(df.train$Age, df.train$Title, 
         fun=function(x)c(Mean=mean(x),Median=median(x)))
 
@@ -218,6 +210,9 @@ summary(df.train$Title)
 
 #All of the work done designing the new Title column can be considered a part of feature engineering. The other features I chose to add are generated using custom function featureEngrg, which can be applied to both the training data in df.train and the Kaggle-provided test data in df.infer.
 
+require(plyr)     # for the revalue function 
+require(stringr)  # for the str_sub function
+
 ## test a character as an EVEN single digit
 isEven <- function(x) x %in% c("0","2","4","6","8") 
 ## test a character as an ODD single digit
@@ -268,6 +263,7 @@ df.train <- featureEngrg(df.train)
 #Deck - levels are as shown in the Titanic cross-section displayed previously. Cabin data provided for just 23 percent of training data records, so it's tough to give this one much emphasis.
 #Side - subject to the same concern (dearth of data) expressed for Deck
 #I finish the data munging process by paring down the data frame to the columns I will use in model building.
+require(caret)
 
 train.keeps <- c("Fate", "Sex", "Boat.dibs", "Age", "Title", 
                  "Class", "Deck", "Side", "Fare", "Fare.pp", 
@@ -279,7 +275,6 @@ df.train.munged <- df.train[train.keeps]
   
 ## split training data into train batch and test batch
 set.seed(23)
-
 training.rows <- createDataPartition(df.train.munged$Fate, p = 0.8, list = FALSE)
 train.batch <- df.train.munged[training.rows, ]
 test.batch <- df.train.munged[-training.rows, ]
@@ -321,7 +316,7 @@ cv.ctrl <- trainControl(method = "repeatedcv", repeats = 3,
                         summaryFunction = twoClassSummary,
                         classProbs = TRUE)
 
-
+require(pROC)
 #Below is the train function call using the same formula (sans Fare) that we recently passed through glm function. I use the metric argument to tell train to optimize the model by maximizing the area under the ROC curve (AUC). summary(), another extractor function, is called to generate regression coefficients with standard errors and a z-test, plus the residual deviance metric we were watching earlier.
 set.seed(35)
 glm.tune.1 <- train(Fate ~ Sex + Class + Age + Family + Embarked,
