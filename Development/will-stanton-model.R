@@ -41,10 +41,15 @@ head(trainSet)
 
 head(testSet)
 
-#We want to know which variables are the best predictors for “Survived,” so we will look at the crosstabs between “Survived” and each other variable
+#We want to know which variables are the best predictors for “Survived,” so we will 
+#look at the crosstabs between “Survived” and each other variable
 table(trainSet[,c("Survived", "Pclass")])
 
-#Looking at this crosstab, we can see that “Pclass” could be a useful predictor of “Survived.” Why? The first column of the crosstab shows that of the passengers in Class 1, 136 survived and 80 died (ie. 63% of first class passengers survived). On the other hand, in Class 2, 87 survived and 97 died (ie. only 47% of second class passengers survived). Finally, in Class 3, 119 survived and 372 died (ie. only 24% of third class passengers survived). 
+#Looking at this crosstab, we can see that “Pclass” could be a useful predictor 
+#of “Survived.” Why? The first column of the crosstab shows that of the passengers 
+#in Class 1, 136 survived and 80 died (ie. 63% of first class passengers survived). 
+#On the other hand, in Class 2, 87 survived and 97 died (ie. only 47% of second class 
+#passengers survived). Finally, in Class 3, 119 survived and 372 died (ie. only 24% of third class passengers survived). 
 #We definitely want to use Pclass in our model, because it definitely has strong predictive value of whether someone survived or not.
 
 table(trainSet[,c("Survived", "Sex")])
@@ -55,7 +60,12 @@ table(trainSet[,c("Survived", "Embarked")])
 
 #Plots for continuous variables
 
-#Plots are often a better way to identify useful continuous variables than crosstabs are (this is mostly because crosstabs aren't so natural for numerical variables). We will use “conditional” box plots to compare the distribution of each continuous variable, conditioned on whether the passengers survived or not ('Survived' = 1 or 'Survived' = 0). You may need to install the *fields* package first, just like you installed *caret* and *randomForest*.
+#Plots are often a better way to identify useful continuous variables 
+#than crosstabs are (this is mostly because crosstabs aren't so natural for numerical 
+#variables). We will use “conditional” box plots to compare the distribution of each 
+#continuous variable, conditioned on whether the passengers survived or not 
+#('Survived' = 1 or 'Survived' = 0). You may need to install the *fields* 
+#package first, just like you installed *caret* and *randomForest*.
 
 # Comparing Age and Survived.
 library(fields)
@@ -71,8 +81,13 @@ bplot.xy(trainSet$Survived, trainSet$Fare2, main="Titanic Pasenger Fate and Fare
 
 #Training a model
 
-#Training the model uses a pretty simple command in caret, but it's important to understand each piece of the syntax. First, we have to convert Survived to a Factor data type, so that caret builds a classification instead of a regression model. Then, we use the train command to train the model (go figure!). You may be asking what a random forest algorithm is. You can think of it as training a bunch of different decision trees and having them vote
-#(remember, this is an irresponsibly fast tutorial). Random forests work pretty well in *lots* of different situations, so I often try them first. 
+#Training the model uses a pretty simple command in caret, but it's important to 
+#understand each piece of the syntax. First, we have to convert Survived to a Factor data
+#type, so that caret builds a classification instead of a regression model. Then, we use 
+#the train command to train the model (go figure!). You may be asking what a random 
+#forest algorithm is. You can think of it as training a bunch of different decision trees and having them vote
+#(remember, this is an irresponsibly fast tutorial). Random forests work pretty well 
+#in *lots* of different situations, so I often try them first. 
 
 # Convert Survived to Factor
 trainSet$Survived <- factor(trainSet$Survived)
@@ -91,15 +106,29 @@ model <- train(Survived ~ Pclass + Sex + SibSp +
 
 #Evaluating the model
 
-#For the purposes of this tutorial, we will use cross-validation scores to evaluate our model. Note: in real life (ie. not Kaggle), most data scientists also split the training set further into a training set and a validation set, but that is for another post. 
+#For the purposes of this tutorial, we will use cross-validation scores to evaluate 
+#our model. Note: in real life (ie. not Kaggle), most data scientists also split 
+#the training set further into a training set and a validation set, but that is for 
+#another post. 
 
-#Cross-validation is a way to evaluate the performance of a model without needing any other data than the training data. It sounds complicated, but it's actually a pretty simple trick. Typically, you randomly split the training data into 5 equally sized pieces called “folds” (so each piece of the data contains 20% of the training data). Then, you train the model on 4/5 of the data, and check its accuracy on the 1/5 of the data you left out. You then repeat this process with each split of the data. At the end, you average the percentage accuracy across the five different splits of the data to get an average accuracy. Caret does this for you, and you can see the scores by looking at the model output:
+#Cross-validation is a way to evaluate the performance of a model without needing 
+#any other data than the training data. It sounds complicated, but it's actually a 
+#pretty simple trick. Typically, you randomly split the training data into 5 equally 
+#sized pieces called “folds” (so each piece of the data contains 20% of the training 
+#data). Then, you train the model on 4/5 of the data, and check its accuracy 
+#on the 1/5 of the data you left out. You then repeat this process with each split 
+#of the data. At the end, you average the percentage accuracy across the five 
+#different splits of the data to get an average accuracy. 
+#Caret does this for you, and you can see the scores by looking at the model output:
 
 model
 
 #Making predictions on the test set
 
-#Using caret, it is easy to make predictions on the test set to upload to Kaggle. You just have to call the predict method on the model object you trained. Let's make the predictions on the test set and add them as a new column.
+#Using caret, it is easy to make predictions on the test set to upload to Kaggle. 
+#You just have to call the predict method on the model object you trained. 
+#Let's make the predictions on the test set and add them as a new column.
+
 testSet$Survived <- predict(model, newdata = testSet)
 
 #Uh, oh! There is an error here! When you get this type of error in R, it means that you are trying to assign a vector of one length to a vector of a different length, so the two vectors don't line up. So how do we fix this problem? 
