@@ -62,17 +62,26 @@ Pclass_survival <- table(trainSet$Survived, trainSet$Pclass)
 barplot(Pclass_survival, xlab = "Cabin Class", ylab = "Number of People", 
         main = "survived and deceased between male and female")
 
-#Looking at this crosstab, we can see that “Pclass” could be a useful predictor of “Survived.” 
-#Why? The first column of the crosstab shows that of the passengers in Class 1, 136 survived and 80 died (ie. 63% of first class passengers survived). On the other hand, in Class 2, 87 survived and 97 died (ie. only 47% of second class passengers survived). Finally, in Class 3, 119 survived and 372 died (ie. only 24% of third class passengers survived). 
-#We definitely want to use Pclass in our model, because it definitely has strong predictive value of whether someone survived or not.
+#Looking at this crosstab, we can see that “Pclass” could be a useful predictor of 
+#“Survived.” 
+#Why? The first column of the crosstab shows that of the passengers in Class 1, 
+#136 survived and 80 died (ie. 63% of first class passengers survived). On the 
+#other hand, in Class 2, 87 survived and 97 died (ie. only 47% of second class 
+#passengers survived). Finally, in Class 3, 119 survived and 372 died (ie. only 
+#24% of third class passengers survived). 
+#We definitely want to use Pclass in our model, because it definitely has strong 
+#predictive value of whether someone survived or not.
 
 table(trainSet[,c("Survived", "Sex")])
 
 counts <- table(trainSet$Survived, trainSet$Sex)
 barplot(counts, xlab = "Gender", ylab = "Number of People", main = "survived and deceased between male and female")
 
-table(trainSet[,c("Survived", "Embarked")])
 #Embarked
+table(trainSet[,c("Survived", "Embarked")])
+embarked_survival <- table(trainSet[,c("Survived", "Embarked")])
+barplot(embarked_survival, xlab = "Embarkation", ylab = "Number of People", 
+        main = "survived and deceased between points of Boarding")
 
 #Plots for continuous variables
 
