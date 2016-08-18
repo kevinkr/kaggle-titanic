@@ -25,6 +25,15 @@ predictors <- predictors[-3]
 
 #idenitfy missing values, fill in
 
+#Embarked - change to factor and do something like...
+#trainData$Embarked[which(is.na(trainData$Embarked) | trainData$Embarked=="")] <- 'S'
+
+#see liberty and data kaggle titanic on how to clean up fare
+
+#see Mike Bernico video on filling in missing values
+#https://www.youtube.com/watch?v=0GrciaGYzV0
+
+
 
 
 # Explore Data Relationships
