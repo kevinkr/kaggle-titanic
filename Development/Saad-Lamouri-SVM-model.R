@@ -9,8 +9,8 @@ library(RCurl)
 # load data
 
 # read data into memory
-train <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/train.csv"),header =  TRUE)
-test <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/test.csv"),header =  TRUE)
+train <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/train.csv"),header =  TRUE, stringsAsFactors = FALSE)
+test <- read.csv(text=getURL("https://raw.githubusercontent.com/kevinkr/kaggle-titanic/master/Data/test.csv"),header =  TRUE, stringsAsFactors = FALSE)
 
 # save the number of  rows in the train dataset
 train.nrow<-seq(1, nrow(train)) 
@@ -19,6 +19,12 @@ train.nrow<-seq(1, nrow(train))
 train.nosurvive <- train[-2]
 
 predictors<-rbind(train.nosurvive, test) 
+
+#drop name
+predictors <- predictors[-3]
+
+#idenitfy missing values, fill in
+
 
 
 # Explore Data Relationships
