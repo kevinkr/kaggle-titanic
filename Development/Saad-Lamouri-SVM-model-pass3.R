@@ -83,25 +83,26 @@ predictors$Cabin <- ifelse (predictors$Cabin=="", "Missing", substring(predictor
 #All missing data elminated. Time to convert to numerical values.
 ###
 str(predictors)
-predictors$Embarked <- as.factor(predictors$Embarked)
-predictors$Sex <- as.factor(predictors$Sex)
-predictors$Cabin <- as.factor(predictors$Cabin)
+#predictors$Embarked <- as.factor(predictors$Embarked)
+#predictors$Sex <- as.factor(predictors$Sex)
+#predictors$Cabin <- as.factor(predictors$Cabin)
 #convert int and factor to numeric
-predictors[, c(1,2,4,6,7,10,11,12)] <- sapply(predictors[, c(1,2,4,6,7,10,11,12)], as.numeric)
+#predictors[, c(1,2,4,6,7,10,11,12)] <- sapply(predictors[, c(1,2,4,6,7,10,11,12)], as.numeric)
 
 #drop name
 predictors <- predictors[-3]
 
 library(dummies)
 
-new_predictors <- dummy.data.frame(predictors, names = c("Ticket"))
+new_predictors <- dummy.data.frame(predictors, names = c("PassengerID", "Pclass", "Sex", "Age", "SibSp", "Parch", "Ticket", "Cabin", "Embarked", "Title"))
+
 
 
 
 
 # Explore Data Relationships
 library(corrgram)
-corrgram(predictors,order=NULL,lower.panel=panel.shade,
+corrgram(new_predictors,order=NULL,lower.panel=panel.shade,
          upper.panel=NULL,text.panel = panel.txt)
 
 # Apply Principal Component Analysis
@@ -109,7 +110,7 @@ pca <- prcomp(new_predictors)
 summary(pca)
 
 # Construct Training Data
-components <- 14
+components <- 12
 allData <- pca$x[,1:components]
 
 trainData <- as.data.frame(allData[1:891,])
@@ -131,7 +132,7 @@ tuned$best.parameters
 model  <- svm(Survived~., data = training, 
               gamma=tuned$best.parameters$gamma, 
               cost=tuned$best.parameters$cost, 
-              type="C-classification")
+              type="eps-regression")
 summary(model)
 
 fit <- fitted(model)
@@ -146,10 +147,13 @@ tab
 classAgreement(tab)
 
 # Predict with New Data Set
-finalData <- as.data.frame(allData[1001:10000,])
+finalData <- as.data.frame(allData[892:1309,])
+#finalData <- as.data.frame(allData[1001:10000,])
 final <- predict(model, newdata = finalData)
 
-fd <- data.frame(Id = 1:9000, Solution = final)
+fd <- data.frame(PassengerId = 892:1309, Survived = final)
 
 # write results
-write.csv(fd, file = "data/sklearn/predictions.csv",row.names=F, quote = F)
+write.csv(fd, file = "saad-lamouri-svm-pass4-predictions.csv",row.names=F, quote = F)
+
+#0.7752

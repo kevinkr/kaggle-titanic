@@ -83,18 +83,19 @@ predictors$Cabin <- ifelse (predictors$Cabin=="", "Missing", substring(predictor
 #All missing data elminated. Time to convert to numerical values.
 ###
 str(predictors)
-predictors$Embarked <- as.factor(predictors$Embarked)
-predictors$Sex <- as.factor(predictors$Sex)
-predictors$Cabin <- as.factor(predictors$Cabin)
+#predictors$Embarked <- as.factor(predictors$Embarked)
+#predictors$Sex <- as.factor(predictors$Sex)
+#predictors$Cabin <- as.factor(predictors$Cabin)
 #convert int and factor to numeric
-predictors[, c(1,2,4,6,7,10,11,12)] <- sapply(predictors[, c(1,2,4,6,7,10,11,12)], as.numeric)
+#predictors[, c(1,2,4,6,7,10,11,12)] <- sapply(predictors[, c(1,2,4,6,7,10,11,12)], as.numeric)
 
 #drop name
-predictors <- predictors[-3]
+#predictors <- predictors[-3]
 
 library(dummies)
 
-new_predictors <- dummy.data.frame(predictors, names = c("Ticket"))
+new_predictors <- dummy.data.frame(predictors, names = c("PassengerID", "Pclass", "Name", "Sex", "Age", "SibSp", "Parch", "Ticket", "Cabin", "Embarked", "Title"))
+
 
 
 
@@ -146,10 +147,13 @@ tab
 classAgreement(tab)
 
 # Predict with New Data Set
-finalData <- as.data.frame(allData[1001:10000,])
+finalData <- as.data.frame(allData[892:1309,])
+#finalData <- as.data.frame(allData[1001:10000,])
 final <- predict(model, newdata = finalData)
 
-fd <- data.frame(Id = 1:9000, Solution = final)
+fd <- data.frame(PassengerId = 892:1309, Survived = final)
 
 # write results
-write.csv(fd, file = "data/sklearn/predictions.csv",row.names=F, quote = F)
+write.csv(fd, file = "saad-lamouri-svm-pass2-predictions.csv",row.names=F, quote = F)
+
+#0.7752
