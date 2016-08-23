@@ -132,7 +132,7 @@ tuned$best.parameters
 model  <- svm(Survived~., data = training, 
               gamma=tuned$best.parameters$gamma, 
               cost=tuned$best.parameters$cost, 
-              type="eps-regression")
+              type="c-classification")
 summary(model)
 
 fit <- fitted(model)
