@@ -72,7 +72,6 @@ glimpse(trainset)
 
 hist_Age <- ggplot(trainset, aes(Age, fill=Survived))
   hist_Age +geom_bar(binwidth = 5)
-
   hist_Age + geom_bar(position="fill", binwidth=4) #proportions 
 
 #Sex
@@ -374,4 +373,130 @@ hist_Child <- ggplot(trainset, aes(x=Child, fill=Survived))
   summary(embmodel)
   exp(cbind(OR = coef(embmodel), confint(embmodel))) # odds ratios and 95% CI
   
+  #Family size
+  fsmodel <- glm(Survived ~ familysize, family="binomial", data= train)
+  summary(fsmodel)
+  
+  exp(cbind(OR = coef(fsmodel), confint(fsmodel))) # odds ratios and 95% CI
+  
+  #Small family
+  smfammodel <- glm(Survived ~ smallfamily, family="binomial", data= train)
+  summary(smfammodel)
+  exp(cbind(OR = coef(smfammodel), confint(smfammodel))) # odds ratios and 95% CI
+  
+  #Not alone
+  namodel <- glm(Survived ~ notalone, family="binomial", data= train)
+  summary(namodel)
+  exp(cbind(OR = coef(namodel), confint(namodel))) # odds ratios and 95% CI
+  
+  #Child
+  kidmodel <- glm(Survived ~ Child, family="binomial", data= train)
+  summary(kidmodel)
+  exp(cbind(OR = coef(kidmodel), confint(kidmodel))) # odds ratios and 95% CI
+  
+  #Title
+  titlemodel <- glm(Survived ~ title, family="binomial", data= train)
+  summary(titlemodel)
+  exp(cbind(OR = coef(titlemodel), confint(titlemodel))) # odds ratios and 95% CI
+  
+  ######
+  #Multivariable logistic regression models
+  ######
+  model1 <- (step(glm(Survived ~ Sex+smallfamily+notalone+Parch
+    +Child+Age+Fare+thirdClass+SibSp, family="binomial", data= train ),direction= "backward"))
+  summary(model1)
+  exp(cbind(OR = coef(model1), confint(model1))) # odds ratios and 95% CI
+  
+  model2 <- (step(glm(Survived ~ Sex+Pclass+smallfamily
+    +notalone+Child+Age+Fare, family="binomial", data= train ),direction= "backward"))
+  summary(model2)
+  exp(cbind(OR = coef(model1), confint(model1))) # odds ratios and 95% CI
+  
+  model3 <- glm(Survived ~ Sex+Pclass+smallfamily+notalone+Child, 
+    family="binomial", data= train)
+  summary(model3)
+  exp(cbind(OR = coef(model3), confint(model3))) # odds ratios and 95% CI
+  
+  model4 <- glm(Survived ~ Sex+Pclass+smallfamily+notalone+Child+Age+Fare, 
+    family="binomial", data= train)
+  summary(model4)
+  exp(cbind(OR = coef(model4), confint(model4))) # odds ratios and 95% CI
+  
+  #################################
+  #Classification statistics and AUROC analysis
+  ##################################
+  #
+  library(caret)
+  library(pROC)
+  
+  #Model performance
+  train$SurvivedYhat <- predict(model3, type = "response")  # generate yhat values on train df
+  train$SurvivedYhat <- ifelse(train$SurvivedYhat > 0.5, 1.0, 0.0)  # set binary prediction threshold
+  confusionMatrix(train$Survived,train$SurvivedYhat)  # run confusionMatrix to assess accuracy
+  
+  auc(roc(train$Survived,train$SurvivedYhat))  # calculate AUROC curve 
+  #AUROC 0.8136
+  
+  #Generate predicted values in test data for best model “model3”
+  test$Survived <- predict(model3, newdata = test, type = "response")  
+  test$Survived <- ifelse(test$Survived > 0.5, 1.0, 0.0)  # set binary prediction threshold
+  
+  testSubmission <- data.frame(cbind(test$PassengerId, test$Survived))
+  colnames(testSubmission) <- c("PassengerId", "Survived")
+  
+  #write csv for submission
+  write.csv(testSubmission, "JamesNelsonSubmissionlogmodel3.csv", row.names = FALSE)
+  
+  ###########################
+  #Recursive Partitioning Models
+  ###########################
+  library(rpart)
+  library(rattle)
+  
+  library(rpart.plot)
+  library(RColorBrewer)
+  
+  #Build the decision tree
+  rpart4 <- rpart(Survived ~ Sex+Pclass+smallfamily+notalone+Child
+    +Age+Fare+title, data = train, method ="class")
+  
+  #Visualize the decision tree using rpart.plot
+  fancyRpartPlot(rpart4) 
+  
+  #Make prediction using the test set
+  my_prediction <- predict(rpart4, test, type = "class")
+  
+  #Create a data frame with two columns for submission to Kaggle: PassengerId & Survived.
+  my_solution <- data.frame(PassengerId = test$PassengerId, Survived = my_prediction)
+  
+  #Check that my_solution has 418 entries
+  nrow(my_solution)
+  
+  #write csv for submission
+  write.csv(my_solution, "JamesNelsonrpart4.csv", row.names = FALSE)
+  
+  ###########################
+  #Random Forest Models
+  #############################
+  library(randomForest)
+  
+  set.seed(123)
+  
+  #Apply the Random Forest Algorithm and check variable importance
+  rf4 <- randomForest(Survived ~ (Sex+Pclass+smallfamily+notalone+Child), 
+    data = train, ntree = 1000, importance = TRUE)
+  
+  round(importance(rf4), 1)
+  
+  #Make a prediction using the test set
+  my_prediction<- predict(rf4, newdata=test)
+  
+  #Create a data frame with two columns for submission to Kaggle: PassengerId & Survived.
+  my_solution <- data.frame(PassengerId = test$PassengerId, Survived = my_prediction)
+  
+  #Check that my_solution has 418 entries
+  nrow(my_solution)
+  
+  #write csv for submission
+  write.csv(my_solution, "JamesNelsonrfpart1.csv", row.names = FALSE)
   
